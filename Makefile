@@ -1,6 +1,8 @@
-SRC=main.cpp
+SRC=main.cpp \
+	vulkfm.cpp
+	
 OBJS=$(SRC:.cpp=.o)
-CXXFLAGS=-std=c++14 -m64 $(shell sdl2-config --cflags)
+CXXFLAGS=-std=c++14 -m64 $(shell sdl2-config --cflags) -g
 LDFLAGS=$(shell sdl2-config --libs)
 OUT=play
 
