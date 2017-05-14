@@ -4,6 +4,9 @@
 #include <cstring>
 #include <cmath>
 
+
+#define TAU (M_PI*2)
+
 struct osc
 {
 	float freq;
@@ -25,7 +28,7 @@ static void audio_fill_buffer(void* userdata, Uint8* stream, int len)
 	int samples = len / sizeof(int16_t);
 	for(int i = 0; i < samples;++i)
 	{
-		float sample = sinf(carrier.phase) * 16000;
+		float sample = sinf(carrier.phase*TAU) * 16000;
 		carrier.phase += sampTime*carrier.freq;
 		*buff++ = (int16_t)sample;
 	}
