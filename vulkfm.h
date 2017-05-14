@@ -21,7 +21,7 @@ enum EWaveForm
 class Env
 {
 public:
-	Env( float _attack = 0.15f, float _attackLevel = 1.0f, float _decay = 0.3f, float _sustain = 0.3f, float _release = 0.3f );
+	Env( float _attack = 0.05f, float _attackLevel = 1.0f, float _decay = 0.3f, float _sustain = 0.7f, float _release = 0.7f );
 	void trigger();
 
 	void release();
@@ -49,8 +49,8 @@ protected:
 class Osc
 {
 public:
-	Osc(float _freq = 440, float _amp = 1.0f, EWaveForm _waveform = Sine);
-	void trigger(float _freq);
+	Osc();
+	void trigger(float _freq, bool retrigger);
 	void update(float time);
 	float evaluate(float fmodulation);
 
@@ -67,6 +67,7 @@ protected:
 class Operator
 {
 public:
+	Operator();
 	Osc osc_;
 	Env env_;
 
@@ -74,7 +75,7 @@ public:
 	float release_;
 	bool held_;
 
-	void trigger(float freq);
+	void trigger(float freq, bool retrigger);
 	void release();
 
 	bool update(float deltaTime);
@@ -87,19 +88,23 @@ class Instrument
 {
 public:
 	Instrument();
-	void trigger(int note);
+	void trigger(int note, bool retrigger);
 	void release();
 	float evaluate();
 	bool update(float dt);
 	bool isActive() { return active_; }
 	Operator& getOperator(int idx) { return ops[idx]; }
 
+	int currentNote() { return note_; }
+
 protected:
 
-	int8_t order[OP_COUNT] 		{  0, 1, -1, -1 }; 	// order to run operators
-	int8_t mods[OP_COUNT] 		{  -1, -1, -1, -1 }; 	// modulation input to operators
-	int8_t outs[OP_COUNT] 		{  0, 1,  0,  0 }; 	// modulation input to operators
-	float  freqscale[OP_COUNT]	{  3.f/2, 1, 0, 0 };
+	int8_t order[OP_COUNT] 		{  0,  1, -1, -1 }; 	// order to run operators
+	int8_t mods[OP_COUNT] 		{  0, 0, -1, -1 }; 	// modulation input to operators
+	int8_t outs[OP_COUNT] 		{  0,  1,  0,  0 }; 	// modulation input to operators
+	float  freqscale[OP_COUNT]	{  (1.f/2)+0.01f, 1, 0, 0 };
+
+	int note_;
 
 	bool active_;
 	Operator ops[OP_COUNT];
@@ -112,19 +117,31 @@ protected:
 class VulkFM
 {
 public:
-	VulkFM()
-	{
-		channels_ = 16;
-		instrumentPool_ = new Instrument*[channels_];
-		for(int i = 0; i < channels_; ++i)
-			instrumentPool_[i] = new Instrument();
-		poolCount_ = channels_;
-	}
+	VulkFM();
+
+	virtual ~VulkFM();
+
+	void update(float dt);
+	float evaluate();
+
+	void trigger(int8_t note, int8_t channel, int8_t velocity);
+	void release(int8_t note, int8_t channel, int8_t velocity);
+
+	int activeVoices() { return activeCount_; }
+
+
+protected:
+	Instrument* getFromPool();
+	void returnToPool(Instrument*);
 
 protected:
 	Instrument** instrumentPool_;
 	int poolCount_;
-	int channels_;
+	Instrument** activeInstruments_;
+
+	int activeCount_;
+	int voices_;
+
 };
 
 

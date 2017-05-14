@@ -7,28 +7,25 @@
 
 #include "vulkfm.h"
 
-
-
 static float sampTime;
 
-static Instrument inst0;
-
-static void audio_fill_buffer(void* userdata, Uint8* stream, int len)
+static void audio_fill_buffer_s16(void* userdata, Uint8* stream, int len)
 {
-	static float time = 0;
 	int16_t* buff = (int16_t*)stream;
 	int samples = len / sizeof(int16_t);
 
+	VulkFM* synth = (VulkFM*)userdata;
+
+
 	for(int i = 0; i < samples;++i)
 	{
-		float sample = inst0.evaluate();
-		inst0.update(sampTime);
-		*buff++ = (int16_t)(sample*32767);
-
-		time += sampTime;
+		float sample = synth->evaluate();
+		synth->update(sampTime);
+		// Clip instead of overflow
+		sample = sample<-1.f?-1.f:(sample>1.f?1.f:sample);
+		*buff++ = (int16_t)(sample*(32768>>1));
 	}
 }
-
 
 static SDL_Window* open_window()
 {
@@ -50,15 +47,15 @@ static void test_envelope()
 	for(int i = 0; i < 50; ++i)
 	{
 		auto val = e.evaluate();
-		printf("%d: %f\n", i, val);
-		e.update(0.05f);
+		auto playing = e.update(0.05f);
+		printf("%d: %f (%d)\n", i, val, playing);
 	}
 	e.release();
 	for(int i = 0; i < 50; ++i)
 	{
 		auto val = e.evaluate();
-		printf("%d: %f\n", i, val);
-		e.update(0.05f);
+		auto playing = e.update(0.05f);
+		printf("%d: %f (%d)\n", i, val, playing);
 	}
 
 }
@@ -67,10 +64,11 @@ static void test_envelope()
 
 int main(int argc, char*argv[])
 {
+	VulkFM vulkSynth;
 
-/*	test_envelope();
-	return 0;
-*/
+	// test_envelope();
+	// return 0;
+
 
 	if( 0 != SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO) )
 	{
@@ -81,11 +79,13 @@ int main(int argc, char*argv[])
 
 	memset(&want,0,sizeof(want));
 
-	want.freq = 48000;
+	want.freq = 22050;
 	want.format = AUDIO_S16SYS;
+	// want.format = AUDIO_F32SYS;
 	want.channels = 1;
 	want.samples = 800;
-	want.callback = audio_fill_buffer;
+	want.userdata = &vulkSynth;
+	want.callback = audio_fill_buffer_s16;
 
 	auto audio_device = SDL_OpenAudioDevice(NULL, 0, &want, &got, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
 	if( audio_device == 0 )
@@ -95,7 +95,7 @@ int main(int argc, char*argv[])
 	}
 
 
-	printf("Got an audio device %d with %d channels, %d frequency and %d samples\n", audio_device, got.channels, got.freq, got.samples);
+	printf("Got an audio device %d with %d channels, %d frequency and %d samples in %d format.\n", audio_device, got.channels, got.freq, got.samples, got.format);
 
 
 	int keymap[] {
@@ -124,17 +124,21 @@ int main(int argc, char*argv[])
 	sampTime = 1.0f/got.freq;
 
 
-
 	//Setup instruments
 
-	auto op = inst0.getOperator(1);
-	op.env_ = Env( 0, 0, 1.0, 0 );
-
+	// auto &op = inst0.getOperator(0);
+	// op.env_ = Env( 0.4f, 0.8f, 0.3f, 0.2f, 0 );
+	// inst0.getOperator(1).env_.attackLevel_ = 0.8f;
 
 	SDL_PauseAudioDevice(audio_device,0);
 
 	SDL_Event event;
 	bool quit = false;
+
+	int octave = 4;
+
+	int lastActive = 0;
+
 	while(!quit)
 	{
 		while(SDL_PollEvent(&event))
@@ -148,23 +152,26 @@ int main(int argc, char*argv[])
 					quit = true;
 				else {
 					auto key = event.key.keysym.scancode;
-					int octave = 4;
 					for(int i = 0 ; i < sizeof(keymap); ++i)
 					{
-						if(key == keymap[i])
-						inst0.trigger(i + 12*octave);
+						if(key == keymap[i]) {
+							int note = i + 12*octave;
+							vulkSynth.trigger(note,0,127);
+						}
 					}
 				}
-				 if(event.key.keysym.sym == SDLK_SPACE)
 				break;
 
 			case SDL_KEYUP:
-				if(event.key.repeat == 0)
-				{
+				if(event.key.repeat == 0) {
 					auto key = event.key.keysym.scancode;
 					for(int i = 0 ; i < sizeof(keymap); ++i)
 					{
-						if(key == keymap[i]) inst0.release();
+						if(key == keymap[i])
+						{
+							int note = i + 12*octave;
+							vulkSynth.release(note,0,127);
+						}
 					}
 				}
 				break;
@@ -173,7 +180,16 @@ int main(int argc, char*argv[])
 				break;
 			}
 		}
+
+
+		// if( lastActive != vulkSynth.activeVoices() )
+		// {
+		// 	lastActive = vulkSynth.activeVoices();
+		// 	printf("there are %d active voices\n", lastActive);
+		// }
+
 		fflush(stdout);
+		SDL_Delay(16);
 	}
 
 	printf("leaving\n");
