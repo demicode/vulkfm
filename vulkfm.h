@@ -39,9 +39,8 @@ public:
 
 
 protected:
-	bool held_ = true;
-	float releaseTime_;
-	float time_;
+	float level_;
+	int8_t state_;
 };
 
 
@@ -99,10 +98,10 @@ public:
 
 protected:
 
-	int8_t order[OP_COUNT] 		{  0,  1, -1, -1 }; 	// order to run operators
-	int8_t mods[OP_COUNT] 		{  0, 0, -1, -1 }; 	// modulation input to operators
-	int8_t outs[OP_COUNT] 		{  0,  1,  0,  0 }; 	// modulation input to operators
-	float  freqscale[OP_COUNT]	{  (1.f/2)+0.01f, 1, 0, 0 };
+	int8_t order[OP_COUNT] 		{  0,  1,  2,  3 }; 	// order to run operators
+	int8_t mods[OP_COUNT] 		{  0,  0,  1,  2 }; 	// modulation input to operators
+	int8_t outs[OP_COUNT] 		{  0,  0,  0,  1 }; 	// modulation input to operators
+	float  freqscale[OP_COUNT]	{  2, 1.4f, 1.0f, 1.f/3 };
 
 	int note_;
 

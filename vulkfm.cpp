@@ -50,46 +50,60 @@ float Osc::evaluate(float fmodulation)
 
 Env::Env( float _attack, float _attackLevel, float _decay, float _sustain, float _release )
 : attackLevel_( _attackLevel )
-, attack_( _attack )
-, decay_(_decay)
+, attack_( 1.f/_attack )
+, decay_(1.f/_decay)
 , sustain_(_sustain)
-, release_( _release )
+, release_( 1.f/_release )
+, level_(0)
+, state_(4)
 {
 
 }
 
 void Env::trigger()
 {
-	held_ = true;
-	time_ = 0.f;
+	state_ = 0;
 }
 
-void Env::release() { held_ = false; releaseTime_ = time_; }
+void Env::release()
+{
+	state_ = 3;
+}
 
 bool Env::update(float dt)
 {
-	time_ += dt;
-	if( !held_ ) {
-		float sustainTime = (time_-releaseTime_);
-		if( sustainTime > 0 )
-			return sustainTime < release_;
+	switch(state_) {
+		case 0: // attack
+			level_ += dt*attack_;
+			if(level_ >= attackLevel_) {
+				state_ = 1;
+			}
+			break;
+
+		case 1:
+			level_ -= dt*release_;
+			if(level_ <= sustain_) {
+				state_ = 2;
+			}
+			break;
+
+		case 2:
+			/* sustain at sustain :) */
+			break;
+		case 3:
+			level_ -= dt*release_;
+			if(level_ <= 0) {
+				state_ = 4;
+				level_ = 0.f;
+			}
+			break;
 	}
-	return true;
+	return ( state_ < 4);
 }
 
 float Env::evaluate()
 {
-	float t = time_;
-	if( held_ )
-	{
-		if( t < attack_ ) 	return (t/attack_) * attackLevel_;
-		t -= attack_;
-		if( t < decay_ ) 	return attackLevel_ - ((t/decay_) * (attackLevel_ - sustain_));
-		else return sustain_;
-	} else {
-		float now = ( time_- releaseTime_);
-		return fmaxf(0,(1.0f - (now/release_)) * sustain_);
-	}
+	return level_;
 }
 
 
