@@ -27,48 +27,44 @@ static void audio_fill_buffer_s16(void* userdata, Uint8* stream, int len)
 	}
 }
 
-static SDL_Window* open_window()
+static SDL_Window* window = nullptr;
+static SDL_Renderer* renderer = nullptr;
+
+static void open_window()
 {
-	SDL_Window* window = SDL_CreateWindow("VulkFM", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640, 480, 0 );
-	if( window == NULL)
+	int reslut = SDL_CreateWindowAndRenderer(640, 480, 0, &window, &renderer );
+	if( reslut != 0)
 	{
-		printf("Could not create window\n");
+		printf("Could not create window. %s\n", SDL_GetError());
 		exit(1);
 	}
-	return window;
 }
 
-
-
-static void test_envelope()
+static void render(SDL_Renderer* rend, VulkFM *synth)
 {
-	Env e;
-	e.trigger();
-	for(int i = 0; i < 50; ++i)
+	SDL_SetRenderDrawColor(rend, 0,0,0,255);
+	SDL_RenderClear(rend);
+
+	auto samples = synth->getOutBuffer();
+	SDL_SetRenderDrawColor(rend, 255,255,255,255);
+
+	SDL_Point points[512];
+
+	for(int i = 0 ; i < 512; ++i)
 	{
-		auto val = e.evaluate();
-		auto playing = e.update(0.05f);
-		printf("%d: %f (%d)\n", i, val, playing);
-	}
-	e.release();
-	for(int i = 0; i < 50; ++i)
-	{
-		auto val = e.evaluate();
-		auto playing = e.update(0.05f);
-		printf("%d: %f (%d)\n", i, val, playing);
+		points[i].x = i + ((640-512)>>1);
+		points[i].y = samples[i*2] * 100 + 240;
 	}
 
+	SDL_RenderDrawLines(rend, points, 512);
+
+	SDL_RenderPresent(rend);
 }
-
 
 
 int main(int argc, char*argv[])
 {
 	VulkFM vulkSynth;
-
-	// test_envelope();
-	// return 0;
-
 
 	if( 0 != SDL_Init(SDL_INIT_AUDIO|SDL_INIT_VIDEO) )
 	{
@@ -119,16 +115,11 @@ int main(int argc, char*argv[])
 	};
 
 
-	SDL_Window *window = open_window();
+	open_window();
+	if( window == nullptr)
+		exit(1);
 
 	sampTime = 1.0f/got.freq;
-
-
-	//Setup instruments
-
-	// auto &op = inst0.getOperator(0);
-	// op.env_ = Env( 0.4f, 0.8f, 0.3f, 0.2f, 0 );
-	// inst0.getOperator(1).env_.attackLevel_ = 0.8f;
 
 	SDL_PauseAudioDevice(audio_device,0);
 
@@ -181,6 +172,9 @@ int main(int argc, char*argv[])
 			}
 		}
 
+		// Render UI / visualization
+
+		render(renderer, &vulkSynth);
 
 		// if( lastActive != vulkSynth.activeVoices() )
 		// {
@@ -193,6 +187,7 @@ int main(int argc, char*argv[])
 	}
 
 	printf("leaving\n");
+	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_CloseAudio();
 	SDL_Quit();

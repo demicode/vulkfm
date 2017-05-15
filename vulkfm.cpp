@@ -187,6 +187,7 @@ bool Instrument::update(float dt)
 
 VulkFM::VulkFM()
 {
+	outBufferIdx_ = 0;
 	voices_ = 32;
 	instrumentPool_ = new Instrument*[voices_];
 	activeInstruments_ = new Instrument*[voices_];
@@ -276,7 +277,11 @@ float VulkFM::evaluate()
 	{
 		sample += activeInstruments_[i]->evaluate()*0.7f;
 	}
-	return sample*0.5f;
+
+	outBuffer_[outBufferIdx_++] = sample;
+	outBufferIdx_ =  outBufferIdx_ % 1024;
+
+	return sample*0.3f;
 }
 
 Instrument* VulkFM::getFromPool()

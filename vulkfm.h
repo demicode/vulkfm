@@ -129,6 +129,7 @@ public:
 
 	int activeVoices() { return activeCount_; }
 
+	float* getOutBuffer() { return outBuffer_; }
 
 protected:
 	Instrument* getFromPool();
@@ -142,6 +143,8 @@ protected:
 	int activeCount_;
 	int voices_;
 
+	float outBuffer_[1024]; // Used for visualization, nothing else
+	int outBufferIdx_;
 };
 
 
