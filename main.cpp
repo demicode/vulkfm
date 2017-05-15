@@ -5,6 +5,9 @@
 #include <cmath>
 #include <cassert>
 
+#include "imgui.h"
+#include "imgui_impl_sdl_gl3.h"
+#include <GL/gl3w.h>
 #include "vulkfm.h"
 
 static float sampTime;
@@ -32,21 +35,39 @@ static SDL_Renderer* renderer = nullptr;
 
 static void open_window()
 {
-	int reslut = SDL_CreateWindowAndRenderer(640, 480, 0, &window, &renderer );
-	if( reslut != 0)
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_FORWARD_COMPATIBLE_FLAG);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+	SDL_DisplayMode current;
+	SDL_GetCurrentDisplayMode(0, &current);
+	window = SDL_CreateWindow("VulkFM", SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,640, 480, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+	if( window == nullptr)
 	{
 		printf("Could not create window. %s\n", SDL_GetError());
 		exit(1);
 	}
+
+	SDL_GLContext context = SDL_GL_CreateContext(window);
+
+	int major, minor;
+	SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major);
+	SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor);
+	printf( "OpenGL version %d.%d\n",major,minor);
+
+	gl3wInit();
 }
 
 static void render(SDL_Renderer* rend, VulkFM *synth)
 {
-	SDL_SetRenderDrawColor(rend, 0,0,0,255);
-	SDL_RenderClear(rend);
+	glClearColor(0,0,0,255);
+	glClear(GL_COLOR_BUFFER_BIT);
 
 	auto samples = synth->getOutBuffer();
-	SDL_SetRenderDrawColor(rend, 255,255,255,255);
+
 
 	SDL_Point points[512];
 
@@ -56,9 +77,14 @@ static void render(SDL_Renderer* rend, VulkFM *synth)
 		points[i].y = samples[i*2] * 100 + 240;
 	}
 
-	SDL_RenderDrawLines(rend, points, 512);
+	// glEnableVertexAttribArray();
+	// glVertexAtribPointer(GL);
+	// glDrawArrays(GL_LINES,0,512);
 
-	SDL_RenderPresent(rend);
+//	SDL_RenderDrawLines(rend, points, 512);
+
+//	SDL_RenderPresent(rend);
+
 }
 
 
@@ -119,6 +145,8 @@ int main(int argc, char*argv[])
 	if( window == nullptr)
 		exit(1);
 
+	ImGui_ImplSdlGL3_Init(window);
+
 	sampTime = 1.0f/got.freq;
 
 	SDL_PauseAudioDevice(audio_device,0);
@@ -134,6 +162,9 @@ int main(int argc, char*argv[])
 	{
 		while(SDL_PollEvent(&event))
 		{
+			ImGui_ImplSdlGL3_ProcessEvent(&event);
+
+			// Also handle events myself
 			switch(event.type)
 			{
 			case SDL_KEYDOWN:
@@ -172,20 +203,28 @@ int main(int argc, char*argv[])
 			}
 		}
 
-		// Render UI / visualization
-
 		render(renderer, &vulkSynth);
 
-		// if( lastActive != vulkSynth.activeVoices() )
-		// {
-		// 	lastActive = vulkSynth.activeVoices();
-		// 	printf("there are %d active voices\n", lastActive);
-		// }
+		ImGui_ImplSdlGL3_NewFrame(window);
 
+		// Render UI / visualization
+
+
+		// Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
+		{
+			ImGui::Text("There are %d active voices", vulkSynth.activeVoices());
+			static float f = 0.0f;
+			ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+		}
+
+		ImGui::Render();
+
+		SDL_GL_SwapWindow(window);
 		fflush(stdout);
-		SDL_Delay(16);
+		SDL_Delay(10);
 	}
-
+	ImGui_ImplSdlGL3_Shutdown();
 	printf("leaving\n");
 	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
