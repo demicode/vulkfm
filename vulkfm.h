@@ -3,10 +3,14 @@
 
 #include <cstdint>
 
-#define OP_COUNT 4
+#define OP_COUNT 6
 
 #define ACONST 	1.059463094359f
 
+
+struct Algorithm;
+
+extern Algorithm defaultAlgorithm;
 
 enum EWaveForm
 {
@@ -18,31 +22,25 @@ enum EWaveForm
 
 
 
-class Env
+struct Env
 {
-public:
-	Env( float _attack = 0.05f, float _attackLevel = 1.0f, float _decay = 0.3f, float _sustain = 0.7f, float _release = 0.7f );
-	void trigger();
+	Env( float _attack = 0.05f, float _attackLevel = 1.0f, float _decay = 0.3f, float _sustain = 0.7f, float _release = 1.7f );
 
+	void trigger();
 	void release();
 
 	bool update(float dt);
 	float evaluate();
 
-
-public:
 	float attackLevel_;	// attack level
 	float attack_;		// attack time, 0 -> attack level
 	float decay_;		// decay time, atack level -> sustain
 	float sustain_;		// sustain level
 	float release_;		// release time, sustain -> 0
 
-
-protected:
 	float level_;
 	int8_t state_;
 };
-
 
 
 class Osc
@@ -63,6 +61,21 @@ protected:
 };
 
 
+
+struct OperatorData
+{
+	Env env;
+
+	float oscFreq;
+	float oscAmp;
+	EWaveForm oscWaveform;
+
+	float output;
+
+	float oscPhase;
+};
+
+
 class Operator
 {
 public:
@@ -75,8 +88,19 @@ public:
 
 	bool update(float deltaTime);
 	float evaluate(float modulation);
+
+	OperatorData data_;
 };
 
+
+
+struct Algorithm
+{
+	int8_t operatorCount;     //
+	int8_t order[OP_COUNT];  //		{  0,  1,  2,  3 }; 	// order to run operators
+	int8_t mods[OP_COUNT];  //		{  0,  -1,  -1,  -1 }; 	// modulation input to operators
+	int8_t outs[OP_COUNT]; //		{  1,  0,  0,  0 }; 	// modulation input to operators
+};
 
 
 class Instrument
@@ -93,11 +117,9 @@ public:
 	int currentNote() { return note_; }
 
 protected:
-
-	int8_t order[OP_COUNT] 		{  0,  1,  2,  3 }; 	// order to run operators
-	int8_t mods[OP_COUNT] 		{  0,  0,  1,  2 }; 	// modulation input to operators
-	int8_t outs[OP_COUNT] 		{  0,  0,  0,  1 }; 	// modulation input to operators
-	float  freqscale[OP_COUNT]	{  2, 1.4f, 1.0f, 1.f/3 };
+	const Algorithm&  algo_;
+	float freqscale[OP_COUNT]	{  1.f, 1.f, 1.f, 1.f, 1.f, 1.f };
+	float feedBack_ = 0.3f;
 
 	int note_;
 

@@ -9,6 +9,13 @@
 
 static inline float clamp01f(float v) { return (v<0?0:(v>1.f?1.0f:v)); }
 
+Algorithm defaultAlgorithm { 
+		.operatorCount = 4, 
+		.order = {0, 1, 2, 3 },
+		.mods  = {0, 0, -1, 2},
+		.outs  = {0, 1, 0, 1 },
+};
+
 
 Osc::Osc()
 : freq(0)
@@ -118,7 +125,10 @@ float Operator::evaluate(float modulation)
 	return e*sample;
 }
 
+
+
 Instrument::Instrument()
+: algo_(defaultAlgorithm)
 {
 	active_ = false;
 }
@@ -131,7 +141,7 @@ void Instrument::trigger(int note, bool retrigger = false)
 	float baseFreq = 440.f * powf( ACONST, freqDiff);
 
 
-	for(int i = 0; i < OP_COUNT; ++i)
+	for(int i = 0; i < algo_.operatorCount; ++i)
 	{
 		float fScale = freqscale[i];
 		if( fScale != 0)
@@ -142,7 +152,7 @@ void Instrument::trigger(int note, bool retrigger = false)
 
 void Instrument::release()
 {
-	for(int i = 0; i < OP_COUNT; ++i)
+	for(int i = 0; i < algo_.operatorCount; ++i)
 		ops[i].release();
 }
 
@@ -150,20 +160,21 @@ float Instrument::evaluate()
 {
 	float output = 0;
 	if(active_) {
-		for(int i = 0; i < OP_COUNT; ++i) {
-			auto opIdx = order[i];
+		for(int i = 0; i < algo_.operatorCount; ++i) {
+			auto opIdx = algo_.order[i];
 			if(i < 0 )
 				continue;
 			float modulation = 0;
-			if(mods[opIdx] >= 0) {
-				modulation = outputs[mods[opIdx]];
+			if(algo_.mods[opIdx] >= 0) {
+				modulation = outputs[algo_.mods[opIdx]];
 			}
 			outputs[opIdx] = ops[opIdx].evaluate(modulation);
 		}
-
+		int count = 0;
 		for(int i = 0; i < OP_COUNT; ++i) {
-			if(outs[i])	output += outputs[i];
+			if(algo_.outs[i])	{ output += outputs[i]; count++; }
 		}
+		output = output * 1.f/count;
 	}
 	return output;
 }
@@ -176,7 +187,7 @@ bool Instrument::update(float dt)
 	{
 		for(int i = 0; i < OP_COUNT; ++i)
 		{
-			playing |= ops[i].update(dt) && (outs[i] != 0);
+			playing |= ops[i].update(dt) && (algo_.outs[i] != 0);
 		}
 		active_ = playing;
 	}
