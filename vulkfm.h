@@ -70,10 +70,6 @@ public:
 	Osc osc_;
 	Env env_;
 
-	float time_;
-	float release_;
-	bool held_;
-
 	void trigger(float freq, bool retrigger);
 	void release();
 

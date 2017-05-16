@@ -60,15 +60,9 @@ Env::Env( float _attack, float _attackLevel, float _decay, float _sustain, float
 
 }
 
-void Env::trigger()
-{
-	state_ = 0;
-}
+void Env::trigger() { state_ = 0; }
 
-void Env::release()
-{
-	state_ = 3;
-}
+void Env::release() { state_ = 3; }
 
 bool Env::update(float dt)
 {
@@ -81,7 +75,7 @@ bool Env::update(float dt)
 			break;
 
 		case 1:
-			level_ -= dt*release_;
+			level_ -= dt*decay_;
 			if(level_ <= sustain_) {
 				state_ = 2;
 			}
@@ -101,29 +95,21 @@ bool Env::update(float dt)
 	return ( state_ < 4);
 }
 
-float Env::evaluate()
-{
-	return level_;
-}
+float Env::evaluate() { return level_; }
 
 
-Operator::Operator()
-{
-}
+Operator::Operator() { }
 
+void Operator::trigger(float freq, bool retrigger) { osc_.trigger(freq, retrigger); env_.trigger(); }
 
-void Operator::trigger(float freq, bool retrigger) { time_ = 0.f; held_ = true; osc_.trigger(freq, retrigger); env_.trigger(); }
-
-void Operator::release() { held_ = false; env_.release(); }
+void Operator::release() { env_.release(); }
 
 bool Operator::update(float deltaTime)
 {
 	bool done = env_.update(deltaTime);
 	osc_.update(deltaTime);
-	time_ += deltaTime;
 	return done;
 }
-
 
 float Operator::evaluate(float modulation)
 {

@@ -63,7 +63,7 @@ static void open_window()
 
 static void render(SDL_Renderer* rend, VulkFM *synth)
 {
-	glClearColor(0,0,0,255);
+	glClearColor(0.5f,0.6f,0.4f,1);
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	auto samples = synth->getOutBuffer();
@@ -101,7 +101,7 @@ int main(int argc, char*argv[])
 
 	memset(&want,0,sizeof(want));
 
-	want.freq = 22050;
+	want.freq = 48000;
 	want.format = AUDIO_S16SYS;
 	// want.format = AUDIO_F32SYS;
 	want.channels = 1;
