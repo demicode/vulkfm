@@ -4,8 +4,9 @@
 #include <cstring>
 #include <cmath>
 #include <cassert>
-
+#include <string>
 #include "imgui.h"
+#include "imgui_internal.h"
 #include "imgui_impl_sdl_gl3.h"
 #include <GL/gl3w.h>
 #include "vulkfm.h"
@@ -44,7 +45,7 @@ static void open_window()
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 	SDL_DisplayMode current;
 	SDL_GetCurrentDisplayMode(0, &current);
-	window = SDL_CreateWindow("VulkFM", SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,640, 480, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+	window = SDL_CreateWindow("VulkFM", SDL_WINDOWPOS_UNDEFINED,SDL_WINDOWPOS_UNDEFINED,1280, 720, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
 	if( window == nullptr)
 	{
 		printf("Could not create window. %s\n", SDL_GetError());
@@ -212,14 +213,60 @@ int main(int argc, char*argv[])
 
 		// Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
 		{
-			ImGui::Text("There are %d active voices", vulkSynth.activeVoices());
 
 			// auto &instrument = vulkSynth.getInstrument();
 
 
 			static float f = 0.0f;
-			ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
+			ImGui::Begin("VulkFM");
+
+			if(ImGui::TreeNode("General"))
+			{
+				ImGui::Text("Playback frequency is %dHz", got.freq);
+				ImGui::Text("There are %d active voices", vulkSynth.activeVoices());
+				ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+				ImGui::TreePop();
+			}
+
+			if(ImGui::TreeNode("Operators"))
+			{
+				// for operator in instrument...
+				std::string name = "Operator x";
+
+				for( int i = 0; i< 4;++i)
+				{
+					name[9] = '1' + i;
+					if(ImGui::TreeNode(name.c_str()))
+					{
+						static float a = 0.5f, al= 1.0f, d= 0.5f, s = 0.5f,r = 0.5f;
+
+						const char* waveforms_names[] { "Sine", "Square", "ClampSine", "AbsSine" };
+						static int selected = 0;
+			            ImGui::Combo("Waveform", &selected, waveforms_names, IM_ARRAYSIZE(waveforms_names), 4);
+						ImGui::SliderFloat("Attack", &a, 0.0f, 1.0f);
+						ImGui::SliderFloat("Attack level", &al, 0.0f, 1.0f);
+						ImGui::SliderFloat("Decay", &d, 0.0f, 1.0f);
+						ImGui::SliderFloat("Sustain", &s, 0.0f, 1.0f);
+						ImGui::SliderFloat("Release", &r, 0.0f, 1.0f);
+						ImGui::TreePop();
+					}
+					
+				}
+
+				ImGui::TreePop();
+
+			}
+			ImGui::End();
+
+			ImGui::SetNextWindowSize(ImVec2(528,332));
+			ImGui::Begin("Wave");
+			auto samples = vulkSynth.getOutBuffer();
+
+		    ImGui::PlotLines("", samples, 512, 0,  NULL, -1.5f, 1.5f, ImVec2(512,300), sizeof(float));
+
+			ImGui::End();
 		}
 
 		ImGui::Render();

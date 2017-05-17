@@ -15,8 +15,20 @@ CFLAGS=-m64 -I external/imgui/examples/sdl_opengl_example \
 CXXFLAGS=-std=c++14 -m64 $(shell sdl2-config --cflags) -O0 -g -I external/imgui \
 								-I external/imgui/examples/sdl_opengl3_example \
 								-I external/imgui/examples/libs/gl3w
-LDFLAGS=$(shell sdl2-config --libs) -framework OpenGL -framework CoreFoundation
+LDFLAGS=$(shell sdl2-config --libs) 
 OUT=play
+
+ifeq ($(OS),Windows_NT)
+	#windows specifics...
+$(info Compiling for Windows)
+else
+	UNAME_S := $(shell uname -s)
+	ifeq ($(UNAME_S),Darwin)
+$(info Compiling for macOS)
+		LDFLAGS+=-framework OpenGL -framework CoreFoundation
+	endif
+endif
+
 
 all: $(OBJS) $(OBJS_C)
 	$(CXX) -o $(OUT) $(CXXFLAGS) $(LDFLAGS) $(OBJS) $(OBJS_C)

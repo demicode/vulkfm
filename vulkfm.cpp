@@ -11,9 +11,8 @@ static inline float clamp01f(float v) { return (v<0?0:(v>1.f?1.0f:v)); }
 
 Algorithm defaultAlgorithm { 
 		.operatorCount = 4, 
-		.order = {0, 1, 2, 3 },
-		.mods  = {0, 0, -1, 2},
-		.outs  = {0, 1, 0, 1 },
+		.mods  = { 1, -1,  3, -1 },
+		.outs  = { 1,  0,  1,  0 },
 };
 
 
@@ -39,7 +38,7 @@ void Osc::update(float time)
 		phase_ -= TAU;
 }
 
-float Osc::evaluate(float fmodulation)
+float Osc::evaluate(float fmodulation) const
 {
 	float a = phase_ + fmodulation;
 	float sample = 0.f; 
@@ -55,19 +54,12 @@ float Osc::evaluate(float fmodulation)
 }
 
 
-Env::Env( float _attack, float _attackLevel, float _decay, float _sustain, float _release )
-: attackLevel_( _attackLevel )
-, attack_( 1.f/_attack )
-, decay_(1.f/_decay)
-, sustain_(_sustain)
-, release_( 1.f/_release )
-, level_(0)
-, state_(4)
+Env::Env( )
+: state_(4)
 {
-
 }
 
-void Env::trigger() { state_ = 0; }
+void Env::trigger( const EnvConf* _envConf) { envConf_ = _envConf; state_ = 0; }
 
 void Env::release() { state_ = 3; }
 
@@ -75,24 +67,25 @@ bool Env::update(float dt)
 {
 	switch(state_) {
 		case 0: // attack
-			level_ += dt*attack_;
-			if(level_ >= attackLevel_) {
+			level_ += dt*(1.f/envConf_->attack);
+			if(level_ >= envConf_->attackLevel) {
 				state_ = 1;
 			}
 			break;
 
 		case 1:
-			level_ -= dt*decay_;
-			if(level_ <= sustain_) {
+			level_ -= dt*(1.f/envConf_->decay);
+			if(level_ <= envConf_->sustain) {
 				state_ = 2;
 			}
 			break;
 
 		case 2:
 			/* sustain at sustain :) */
+			level_ = envConf_->sustain;
 			break;
 		case 3:
-			level_ -= dt*release_;
+			level_ -= dt*(1.f/envConf_->release);
 			if(level_ <= 0) {
 				state_ = 4;
 				level_ = 0.f;
@@ -102,12 +95,12 @@ bool Env::update(float dt)
 	return ( state_ < 4);
 }
 
-float Env::evaluate() { return level_; }
+float Env::evaluate() const { return level_; }
 
 
 Operator::Operator() { }
 
-void Operator::trigger(float freq, bool retrigger) { osc_.trigger(freq, retrigger); env_.trigger(); }
+void Operator::trigger(float freq, bool retrigger) { osc_.trigger(freq, retrigger); env_.trigger(&data_.env); }
 
 void Operator::release() { env_.release(); }
 
@@ -118,7 +111,7 @@ bool Operator::update(float deltaTime)
 	return done;
 }
 
-float Operator::evaluate(float modulation)
+float Operator::evaluate(float modulation) const
 {
 	float sample = osc_.evaluate(modulation);
 	float e = env_.evaluate();
@@ -135,11 +128,9 @@ Instrument::Instrument()
 
 void Instrument::trigger(int note, bool retrigger = false)
 {
-	int freqDiff = note-57; // 57 is note for A4 (440Hz)
-	note_ = note;
+	int freqDiff = note-57; // Midi note 57 is A4 (440Hz)
 
 	float baseFreq = 440.f * powf( ACONST, freqDiff);
-
 
 	for(int i = 0; i < algo_.operatorCount; ++i)
 	{
@@ -160,15 +151,12 @@ float Instrument::evaluate()
 {
 	float output = 0;
 	if(active_) {
-		for(int i = 0; i < algo_.operatorCount; ++i) {
-			auto opIdx = algo_.order[i];
-			if(i < 0 )
-				continue;
+		for(int i = algo_.operatorCount -1; i >= 0; --i) {
 			float modulation = 0;
-			if(algo_.mods[opIdx] >= 0) {
-				modulation = outputs[algo_.mods[opIdx]];
+			if(algo_.mods[i] >= 0) {
+				modulation = outputs[algo_.mods[i]];
 			}
-			outputs[opIdx] = ops[opIdx].evaluate(modulation);
+			outputs[i] = ops[i].evaluate(modulation);
 		}
 		int count = 0;
 		for(int i = 0; i < OP_COUNT; ++i) {
@@ -183,10 +171,8 @@ bool Instrument::update(float dt)
 {
 	bool playing = false;
 
-	if( active_ )
-	{
-		for(int i = 0; i < OP_COUNT; ++i)
-		{
+	if( active_ ) {
+		for(int i = 0; i < OP_COUNT; ++i) {
 			playing |= ops[i].update(dt) && (algo_.outs[i] != 0);
 		}
 		active_ = playing;
@@ -201,7 +187,7 @@ VulkFM::VulkFM()
 	outBufferIdx_ = 0;
 	voices_ = 32;
 	instrumentPool_ = new Instrument*[voices_];
-	activeInstruments_ = new Instrument*[voices_];
+	activeInstruments_ = new ActiveVoice[voices_];
 
 	for(int i = 0; i < voices_; ++i)
 		instrumentPool_[i] = new Instrument();
@@ -211,16 +197,14 @@ VulkFM::VulkFM()
 
 VulkFM::~VulkFM()
 {
-	for(int i = 0; i <poolCount_; ++i)
-	{
+	for(int i = 0; i <poolCount_; ++i) {
 		delete instrumentPool_[i];
 	}
 	delete instrumentPool_;
 	instrumentPool_ = nullptr;
 
-	for(int i = 0; i <activeCount_; ++i)
-	{
-		delete activeInstruments_[i];
+	for(int i = 0; i <activeCount_; ++i) {
+		delete activeInstruments_[i].instrument_;
 	}
 	delete activeInstruments_;
 	activeInstruments_ = nullptr;
@@ -231,24 +215,23 @@ void VulkFM::trigger(int8_t note, int8_t channel, int8_t velocity)
 {
 	Instrument* inst = nullptr;
 
-	for(int i = 0; i < activeCount_; ++i)
-	{
-		if(activeInstruments_[i]->currentNote() == note )
-		{
-			inst = activeInstruments_[i];
+	for(int i = 0; i < activeCount_; ++i) {
+		if(activeInstruments_[i].note_ == note ) {
+			inst = activeInstruments_[i].instrument_;
 			break;
 		}
 	}
 
-	if( inst == nullptr )
-	{
+	if( inst == nullptr ) {
 		inst = getFromPool();
-		if(inst != nullptr) // activate
-			activeInstruments_[activeCount_++] = inst;
+		if(inst != nullptr) { // activate 
+			auto &voice = activeInstruments_[activeCount_++];
+			voice.note_ = note;
+			voice.instrument_ = inst;
+		}
 	}
 
-	if( inst != nullptr)
-	{
+	if( inst != nullptr) {
 		bool retrig = inst->isActive();
 		inst->trigger(note, retrig);
 	}
@@ -256,11 +239,9 @@ void VulkFM::trigger(int8_t note, int8_t channel, int8_t velocity)
 
 void VulkFM::release(int8_t note, int8_t channel, int8_t velocity)
 {
-	for(int i = 0; i < activeCount_; ++i)
-	{
-		if(activeInstruments_[i]->currentNote() == note )
-		{
-			activeInstruments_[i]->release();
+	for(int i = 0; i < activeCount_; ++i) {
+		if(activeInstruments_[i].note_ == note ) {
+			activeInstruments_[i].instrument_->release();
 			break;
 		}
 	}
@@ -268,14 +249,11 @@ void VulkFM::release(int8_t note, int8_t channel, int8_t velocity)
 
 void VulkFM::update(float dt)
 {
-	for(int i = 0; i < activeCount_; ++i)
-	{
-		bool playing =  activeInstruments_[i]->update(dt);
-		if(!playing)
-		{
-			returnToPool(activeInstruments_[i]);
-			auto tmp = activeInstruments_[--activeCount_];
-			activeInstruments_[activeCount_] = nullptr;
+	for(int i = 0; i < activeCount_; ++i) {
+		bool playing =  activeInstruments_[i].instrument_->update(dt);
+		if(!playing) {
+			returnToPool(activeInstruments_[i].instrument_);
+			auto &tmp = activeInstruments_[--activeCount_];
 			activeInstruments_[i] = tmp;
 		}
 	}
@@ -284,9 +262,8 @@ void VulkFM::update(float dt)
 float VulkFM::evaluate()
 {
 	float sample = 0;
-	for(int i = 0; i < activeCount_; ++i)
-	{
-		sample += activeInstruments_[i]->evaluate()*0.7f;
+	for(int i = 0; i < activeCount_; ++i) {
+		sample += activeInstruments_[i].instrument_->evaluate()*0.7f;
 	}
 
 	outBuffer_[outBufferIdx_++] = sample;
@@ -298,8 +275,7 @@ float VulkFM::evaluate()
 Instrument* VulkFM::getFromPool()
 {
 	Instrument* inst = nullptr;
-	if(poolCount_ > 0)
-	{
+	if(poolCount_ > 0) {
 		inst = instrumentPool_[--poolCount_];
 	}
 	return inst;

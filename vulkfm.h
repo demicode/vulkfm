@@ -20,23 +20,41 @@ enum EWaveForm
 	AbsSine,
 };
 
-
-
-struct Env
+struct EnvConf
 {
-	Env( float _attack = 0.05f, float _attackLevel = 1.0f, float _decay = 0.3f, float _sustain = 0.7f, float _release = 1.7f );
+	float attackLevel 	= 1.0f;			// attack level
+	float attack		= 0.05f;		// attack time, 0 -> attack level
+	float decay			= 0.2f;			// decay time, atack level -> sustain
+	float sustain		= 0.8f;			// sustain level
+	float release		= 0.4f; 		// release time, sustain -> 0
+};
 
-	void trigger();
+
+struct OperatorData
+{
+	EnvConf env;
+
+	float oscFreq;
+	float oscAmp;
+	EWaveForm oscWaveform;
+
+	float output;
+	float oscPhase;
+};
+
+
+
+class Env
+{
+public:
+	Env();
+	void trigger(const EnvConf* _envConf);
 	void release();
-
 	bool update(float dt);
-	float evaluate();
+	float evaluate() const;
 
-	float attackLevel_;	// attack level
-	float attack_;		// attack time, 0 -> attack level
-	float decay_;		// decay time, atack level -> sustain
-	float sustain_;		// sustain level
-	float release_;		// release time, sustain -> 0
+protected:
+	const EnvConf* envConf_;
 
 	float level_;
 	int8_t state_;
@@ -49,7 +67,7 @@ public:
 	Osc();
 	void trigger(float _freq, bool retrigger);
 	void update(float time);
-	float evaluate(float fmodulation);
+	float evaluate(float fmodulation) const;
 
 public:
 	float freq;
@@ -61,19 +79,6 @@ protected:
 };
 
 
-
-struct OperatorData
-{
-	Env env;
-
-	float oscFreq;
-	float oscAmp;
-	EWaveForm oscWaveform;
-
-	float output;
-
-	float oscPhase;
-};
 
 
 class Operator
@@ -87,7 +92,7 @@ public:
 	void release();
 
 	bool update(float deltaTime);
-	float evaluate(float modulation);
+	float evaluate(float modulation) const;
 
 	OperatorData data_;
 };
@@ -97,7 +102,6 @@ public:
 struct Algorithm
 {
 	int8_t operatorCount;     //
-	int8_t order[OP_COUNT];  //		{  0,  1,  2,  3 }; 	// order to run operators
 	int8_t mods[OP_COUNT];  //		{  0,  -1,  -1,  -1 }; 	// modulation input to operators
 	int8_t outs[OP_COUNT]; //		{  1,  0,  0,  0 }; 	// modulation input to operators
 };
@@ -114,11 +118,10 @@ public:
 	bool isActive() { return active_; }
 	Operator& getOperator(int idx) { return ops[idx]; }
 
-	int currentNote() { return note_; }
-
 protected:
+	// This should never change by evaluation
 	const Algorithm&  algo_;
-	float freqscale[OP_COUNT]	{  1.f, 1.f, 1.f, 1.f, 1.f, 1.f };
+	float freqscale[OP_COUNT]	{  2.f, 1.f, 0.25f, 3.f, 1.f, 1.f };
 	float feedBack_ = 0.3f;
 
 	int note_;
@@ -127,6 +130,29 @@ protected:
 	Operator ops[OP_COUNT];
 	float outputs[OP_COUNT];
 };
+
+
+class Voice
+{
+public:
+	Voice();
+	void trigger(int note, Instrument* instrument);
+	void retrigger();
+	void release();
+	float evaluate();
+	bool update(float dt);
+	bool isActive() { return active_; }
+	Instrument* getInstrument(int idx) { return instrument; }
+
+
+	int currentNote() { return note_; }
+
+protected:
+	int note_;
+	bool active_;
+	Instrument *instrument;
+};
+
 
 
 
@@ -153,11 +179,19 @@ protected:
 	void returnToPool(Instrument*);
 
 protected:
+
+	struct ActiveVoice
+	{
+		int note_;
+		Instrument* instrument_;
+	};
+
 	Instrument** instrumentPool_;
 	int poolCount_;
-	Instrument** activeInstruments_;
 
+	ActiveVoice* activeInstruments_;
 	int activeCount_;
+
 	int voices_;
 
 	float outBuffer_[1024]; // Used for visualization, nothing else
