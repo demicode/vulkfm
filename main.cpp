@@ -32,7 +32,6 @@ static void audio_fill_buffer_s16(void* userdata, Uint8* stream, int len)
 }
 
 static SDL_Window* window = nullptr;
-static SDL_Renderer* renderer = nullptr;
 
 static void open_window()
 {
@@ -52,7 +51,7 @@ static void open_window()
 		exit(1);
 	}
 
-	SDL_GLContext context = SDL_GL_CreateContext(window);
+	/*SDL_GLContext context =*/ SDL_GL_CreateContext(window);
 
 	int major, minor;
 	SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major);
@@ -62,34 +61,8 @@ static void open_window()
 	gl3wInit();
 }
 
-static void render(SDL_Renderer* rend, VulkFM *synth)
-{
-	glClearColor(0.5f,0.6f,0.4f,1);
-	glClear(GL_COLOR_BUFFER_BIT);
 
-	auto samples = synth->getOutBuffer();
-
-
-	SDL_Point points[512];
-
-	for(int i = 0 ; i < 512; ++i)
-	{
-		points[i].x = i + ((640-512)>>1);
-		points[i].y = samples[i*2] * 100 + 240;
-	}
-
-	// glEnableVertexAttribArray();
-	// glVertexAtribPointer(GL);
-	// glDrawArrays(GL_LINES,0,512);
-
-//	SDL_RenderDrawLines(rend, points, 512);
-
-//	SDL_RenderPresent(rend);
-
-}
-
-
-int main(int argc, char*argv[])
+int main(int /*argc*/, char* /*argv*/[])
 {
 	VulkFM vulkSynth;
 
@@ -157,8 +130,6 @@ int main(int argc, char*argv[])
 
 	int octave = 4;
 
-	int lastActive = 0;
-
 	while(!quit)
 	{
 		while(SDL_PollEvent(&event))
@@ -175,7 +146,7 @@ int main(int argc, char*argv[])
 					quit = true;
 				else {
 					auto key = event.key.keysym.scancode;
-					for(int i = 0 ; i < sizeof(keymap); ++i)
+					for(size_t i = 0 ; i < sizeof(keymap); ++i)
 					{
 						if(key == keymap[i]) {
 							int note = i + 12*octave;
@@ -188,7 +159,7 @@ int main(int argc, char*argv[])
 			case SDL_KEYUP:
 				if(event.key.repeat == 0) {
 					auto key = event.key.keysym.scancode;
-					for(int i = 0 ; i < sizeof(keymap); ++i)
+					for(size_t i = 0 ; i < sizeof(keymap); ++i)
 					{
 						if(key == keymap[i])
 						{
@@ -204,28 +175,22 @@ int main(int argc, char*argv[])
 			}
 		}
 
-		render(renderer, &vulkSynth);
-
 		ImGui_ImplSdlGL3_NewFrame(window);
+
+		glClearColor(0.5f,0.6f,0.5f,1);
+		glClear(GL_COLOR_BUFFER_BIT);
 
 		// Render UI / visualization
 
-
-		// Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
 		{
-
-			// auto &instrument = vulkSynth.getInstrument();
-
-
-			static float f = 0.0f;
+			auto instrument = vulkSynth.getInstrument(0);
 
 			ImGui::Begin("VulkFM");
 
-			if(ImGui::TreeNode("General"))
+			if(ImGui::TreeNodeEx("General",ImGuiTreeNodeFlags_DefaultOpen))
 			{
 				ImGui::Text("Playback frequency is %dHz", got.freq);
 				ImGui::Text("There are %d active voices", vulkSynth.activeVoices());
-				ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 				ImGui::TreePop();
 			}
@@ -235,24 +200,31 @@ int main(int argc, char*argv[])
 				// for operator in instrument...
 				std::string name = "Operator x";
 
-				for( int i = 0; i< 4;++i)
+				int operatorCount = instrument->algo_.operatorCount;				
+
+				for( int i = 0; i< operatorCount;++i)
 				{
 					name[9] = '1' + i;
+
+					auto &conf = instrument->opConf_[i];
+
 					if(ImGui::TreeNode(name.c_str()))
 					{
-						static float a = 0.5f, al= 1.0f, d= 0.5f, s = 0.5f,r = 0.5f;
+						// static float a = 0.5f, al= 1.0f, d= 0.5f, s = 0.5f,r = 0.5f;
 
 						const char* waveforms_names[] { "Sine", "Square", "ClampSine", "AbsSine" };
-						static int selected = 0;
-			            ImGui::Combo("Waveform", &selected, waveforms_names, IM_ARRAYSIZE(waveforms_names), 4);
-						ImGui::SliderFloat("Attack", &a, 0.0f, 1.0f);
-						ImGui::SliderFloat("Attack level", &al, 0.0f, 1.0f);
-						ImGui::SliderFloat("Decay", &d, 0.0f, 1.0f);
-						ImGui::SliderFloat("Sustain", &s, 0.0f, 1.0f);
-						ImGui::SliderFloat("Release", &r, 0.0f, 1.0f);
+
+			            ImGui::Combo("Waveform", (int*)&conf.oscWaveform, waveforms_names, IM_ARRAYSIZE(waveforms_names), 4);
+						ImGui::SliderFloat("Attack", &conf.env.attack, 0.0f, 8.0f);
+						ImGui::SliderFloat("Attack level", &conf.env.attackLevel, 0.0f, 1.0f);
+						ImGui::SliderFloat("Decay", &conf.env.decay, 0.0f, 4.0f);
+						ImGui::SliderFloat("Sustain", &conf.env.sustain, 0.0f, 1.0f);
+						ImGui::SliderFloat("Release", &conf.env.release, 0.0f, 4.0f);
+
+						ImGui::DragFloat("Freq scale", &conf.freqScale, 0.25f, 0.f, 14.0f);
+
 						ImGui::TreePop();
 					}
-					
 				}
 
 				ImGui::TreePop();
@@ -267,6 +239,29 @@ int main(int argc, char*argv[])
 		    ImGui::PlotLines("", samples, 512, 0,  NULL, -1.5f, 1.5f, ImVec2(512,300), sizeof(float));
 
 			ImGui::End();
+
+			// Show algorithm data
+			ImGui::Begin("Instrument");
+
+			ImGui::Text("outputs: %d %d %d %d %d %d"
+				, instrument->algo_.outs[0]
+				, instrument->algo_.outs[1]
+				, instrument->algo_.outs[2]
+				, instrument->algo_.outs[3]
+				, instrument->algo_.outs[4]
+				, instrument->algo_.outs[5]
+			);
+
+			ImGui::Text("modulation: %d %d %d %d %d %d"
+				, instrument->algo_.mods[0]
+				, instrument->algo_.mods[1]
+				, instrument->algo_.mods[2]
+				, instrument->algo_.mods[3]
+				, instrument->algo_.mods[4]
+				, instrument->algo_.mods[5]
+			);
+
+			ImGui::End();
 		}
 
 		ImGui::Render();
@@ -277,7 +272,6 @@ int main(int argc, char*argv[])
 	}
 	ImGui_ImplSdlGL3_Shutdown();
 	printf("leaving\n");
-	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_CloseAudio();
 	SDL_Quit();

@@ -9,10 +9,10 @@ SRC_C=external/imgui/examples/libs/gl3w/GL/gl3w.c
 
 OBJS=$(SRC:.cpp=.o)
 OBJS_C:=$(SRC_C:.c=.o)
-CFLAGS=-m64 -I external/imgui/examples/sdl_opengl_example \
+CFLAGS=-Wall -Wextra  -m64 -I external/imgui/examples/sdl_opengl_example \
 		-I external/imgui/examples/libs/gl3w
 
-CXXFLAGS=-std=c++14 -m64 $(shell sdl2-config --cflags) -O0 -g -I external/imgui \
+CXXFLAGS=-Wall -Wextra -std=c++14 -m64 $(shell sdl2-config --cflags) -O0 -g -I external/imgui \
 								-I external/imgui/examples/sdl_opengl3_example \
 								-I external/imgui/examples/libs/gl3w
 LDFLAGS=$(shell sdl2-config --libs) 

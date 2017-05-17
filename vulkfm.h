@@ -8,10 +8,6 @@
 #define ACONST 	1.059463094359f
 
 
-struct Algorithm;
-
-extern Algorithm defaultAlgorithm;
-
 enum EWaveForm
 {
 	Sine,
@@ -30,17 +26,32 @@ struct EnvConf
 };
 
 
-struct OperatorData
+struct OperatorConf
 {
 	EnvConf env;
-
 	float oscFreq;
-	float oscAmp;
+	float oscAmp = 1.0f;
+	float freqScale = 1.0f;
 	EWaveForm oscWaveform;
-
-	float output;
-	float oscPhase;
+	int8_t modulators; 		// Bit mask for what operator out to use for modulation of this one.
 };
+
+struct Algorithm
+{
+	int8_t operatorCount;    //
+	int8_t mods[OP_COUNT];  //		{  0,  -1,  -1,  -1 }; 	// modulation input to operators
+	int8_t outs[OP_COUNT]; //		{  1,  0,  0,  0 }; 	// modulation input to operators
+};
+
+
+struct Instrument
+{
+	Instrument();
+	const Algorithm&  algo_;
+	OperatorConf opConf_[OP_COUNT];
+};
+
+extern Algorithm defaultAlgorithm;
 
 
 
@@ -49,6 +60,7 @@ class Env
 public:
 	Env();
 	void trigger(const EnvConf* _envConf);
+	void retrigger();
 	void release();
 	bool update(float dt);
 	float evaluate() const;
@@ -65,70 +77,34 @@ class Osc
 {
 public:
 	Osc();
-	void trigger(float _freq, bool retrigger);
+	void trigger(float _freq, const OperatorConf *opCont);
+	void retrigger();
 	void update(float time);
 	float evaluate(float fmodulation) const;
 
-public:
-	float freq;
-	float amp;
-	EWaveForm waveform;
-
 protected:
+	const OperatorConf* opConf_;
+	float freq_;
 	float phase_;
 };
-
-
 
 
 class Operator
 {
 public:
 	Operator();
-	Osc osc_;
-	Env env_;
 
-	void trigger(float freq, bool retrigger);
+	void trigger(float freq, const OperatorConf *opConf);
+	void retrigger();
 	void release();
 
 	bool update(float deltaTime);
 	float evaluate(float modulation) const;
 
-	OperatorData data_;
-};
-
-
-
-struct Algorithm
-{
-	int8_t operatorCount;     //
-	int8_t mods[OP_COUNT];  //		{  0,  -1,  -1,  -1 }; 	// modulation input to operators
-	int8_t outs[OP_COUNT]; //		{  1,  0,  0,  0 }; 	// modulation input to operators
-};
-
-
-class Instrument
-{
-public:
-	Instrument();
-	void trigger(int note, bool retrigger);
-	void release();
-	float evaluate();
-	bool update(float dt);
-	bool isActive() { return active_; }
-	Operator& getOperator(int idx) { return ops[idx]; }
-
 protected:
-	// This should never change by evaluation
-	const Algorithm&  algo_;
-	float freqscale[OP_COUNT]	{  2.f, 1.f, 0.25f, 3.f, 1.f, 1.f };
-	float feedBack_ = 0.3f;
+	Osc osc_;
+	Env env_;
 
-	int note_;
-
-	bool active_;
-	Operator ops[OP_COUNT];
-	float outputs[OP_COUNT];
 };
 
 
@@ -136,25 +112,26 @@ class Voice
 {
 public:
 	Voice();
-	void trigger(int note, Instrument* instrument);
+	void trigger(int note, const Instrument* instrument);
 	void retrigger();
 	void release();
 	float evaluate();
 	bool update(float dt);
-	bool isActive() { return active_; }
-	Instrument* getInstrument(int idx) { return instrument; }
+	bool isActive()		{ return active_; }
+	int currentNote()	{ return note_; }
 
-
-	int currentNote() { return note_; }
+	const Instrument *instrument;
+	const Algorithm&  algo_;
 
 protected:
 	int note_;
 	bool active_;
-	Instrument *instrument;
+
+	// float freqscale[OP_COUNT] =	{ 1.f, 1.f, 1.f, 1.f, 1.f, 1.f };
+	Operator ops_[OP_COUNT];
+
+	float outs_[OP_COUNT];
 };
-
-
-
 
 
 class VulkFM
@@ -174,22 +151,28 @@ public:
 
 	float* getOutBuffer() { return outBuffer_; }
 
-protected:
-	Instrument* getFromPool();
-	void returnToPool(Instrument*);
+	Instrument* getInstrument(int /*idx*/) { return activeInstrument_; }
 
 protected:
+	Voice* getFromPool();
+	void returnToPool(Voice*);
+
+	Instrument* getInstrumentByChannel(int /*channel*/) { return activeInstrument_; }
+
+protected:
+
+	Instrument* activeInstrument_;
 
 	struct ActiveVoice
 	{
 		int note_;
-		Instrument* instrument_;
+		Voice* voice_;
 	};
 
-	Instrument** instrumentPool_;
+	Voice** voicePool_;
 	int poolCount_;
 
-	ActiveVoice* activeInstruments_;
+	ActiveVoice* activeVoices_;
 	int activeCount_;
 
 	int voices_;
@@ -197,7 +180,5 @@ protected:
 	float outBuffer_[1024]; // Used for visualization, nothing else
 	int outBufferIdx_;
 };
-
-
 
 #endif
