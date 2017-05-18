@@ -11,7 +11,7 @@ static inline float clamp01f(float v) { return (v<0?0:(v>1.f?1.0f:v)); }
 
 Algorithm defaultAlgorithm { 
 		.operatorCount = 4, 
-		.mods  = { 1, 1,  3, -1 },
+		.mods  = { 0b00000001,  0b00000010,  0b00001000, 0b00000000 },
 		.outs  = { 1,  0,  1,  0 },
 };
 
@@ -24,7 +24,6 @@ void Osc::trigger(float _freq, const OperatorConf *opConf)
 	freq_ = _freq;
 	phase_ = 0;
 }
-
 
 
 void Osc::update(float time)
@@ -165,8 +164,14 @@ float Voice::evaluate()
 		int count = 0;
 		for(int i = algo_.operatorCount -1; i >= 0; --i) {
 			float modulation = 0;
-			if(algo_.mods[i] >= 0) {
-				modulation = outs_[algo_.mods[i]];
+			uint8_t modFlags = algo_.mods[i];
+			if( modFlags!= 0) {
+				for(int m = 0; m < algo_.operatorCount;++m) {
+					if(modFlags&1) {
+						modulation += outs_[algo_.mods[m]];
+					}
+					modFlags >>= 1;
+				}
 			}
 			outs_[i] = ops_[i].evaluate(modulation);
 

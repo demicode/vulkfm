@@ -39,8 +39,8 @@ struct OperatorConf
 struct Algorithm
 {
 	int8_t operatorCount;    //
-	int8_t mods[OP_COUNT];  //		{  0,  -1,  -1,  -1 }; 	// modulation input to operators
-	int8_t outs[OP_COUNT]; //		{  1,  0,  0,  0 }; 	// modulation input to operators
+	uint8_t mods[OP_COUNT];  // bit flags for what input modules the operator
+	int8_t outs[OP_COUNT];
 };
 
 
