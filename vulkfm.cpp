@@ -138,16 +138,17 @@ Instrument::Instrument()
 : algo_(&defaultAlgorithm) { }
 
 
-Voice::Voice() : algo_(defaultAlgorithm) { }
+Voice::Voice() { }
 
 void Voice::trigger(int _note, const Instrument* _inst)
 {
-	this->instrument = _inst;
+	this->inst_ = _inst;
+	opCount_ = _inst->algo_->operatorCount;
 	int freqDiff = _note-57; // Midi note 57 is A4 (440Hz)
 
 	float baseFreq = 440.f * powf( ACONST, freqDiff);
 
-	for(int i = 0; i < algo_.operatorCount; ++i) {
+	for(int i = 0; i < opCount_; ++i) {
 		ops_[i].trigger(baseFreq, &_inst->opConf_[i]);
 	}
 	active_ = true;
@@ -155,14 +156,14 @@ void Voice::trigger(int _note, const Instrument* _inst)
 
 void Voice::retrigger()
 {
-	for(int i = 0; i < algo_.operatorCount; ++i) {		
+	for(int i = 0; i < opCount_; ++i) {		
 		ops_[i].retrigger();
 	}	
 }
 
 void Voice::release()
 {
-	for(int i = 0; i < algo_.operatorCount; ++i)
+	for(int i = 0; i < opCount_; ++i)
 		ops_[i].release();
 }
 
@@ -170,12 +171,13 @@ float Voice::evaluate()
 { 
 	float output = 0;
 	if(active_) {
+		const Algorithm* algo = inst_->algo_;
 		int count = 0;
-		for(int i = algo_.operatorCount -1; i >= 0; --i) {
+		for(int i = opCount_ -1; i >= 0; --i) {
 			float modulation = 0;
-			uint8_t modFlags = algo_.mods[i];
+			uint8_t modFlags = algo->mods[i];
 			if( modFlags!= 0) {
-				for(int m = algo_.operatorCount -1; m >= i; --m) {
+				for(int m = opCount_ -1; m >= i; --m) {
 					if(modFlags&(1u<<m)) {
 						modulation += outs_[m];
 					}
@@ -183,7 +185,7 @@ float Voice::evaluate()
 			}
 			outs_[i] = ops_[i].evaluate(modulation);
 
-			if(algo_.outs & (1u<<i)) { output += outs_[i]; count++; }
+			if(algo->outs & (1u<<i)) { output += outs_[i]; count++; }
 		}
 		output = output * 1.f/count;
 	}
@@ -195,8 +197,9 @@ bool Voice::update(float dt)
 	bool playing = false;
 
 	if( active_ ) {
-		for(int i = 0; i < algo_.operatorCount; ++i) {
-			playing |= ops_[i].update(dt) && (algo_.outs&(1u<<i));
+		const uint8_t outs = inst_->algo_->outs;
+		for(int i = 0; i < opCount_; ++i) {
+			playing |= ops_[i].update(dt) && (outs&(1u<<i));
 		}
 		active_ = playing;
 	}

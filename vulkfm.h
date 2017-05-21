@@ -105,7 +105,6 @@ public:
 protected:
 	Osc osc_;
 	Env env_;
-
 };
 
 
@@ -121,14 +120,13 @@ public:
 	bool isActive()		{ return active_; }
 	int currentNote()	{ return note_; }
 
-	const Instrument *instrument;
-	const Algorithm&  algo_;
+	const Instrument *inst_;
 
 protected:
+	int opCount_;
 	int note_;
 	bool active_;
 
-	// float freqscale[OP_COUNT] =	{ 1.f, 1.f, 1.f, 1.f, 1.f, 1.f };
 	Operator ops_[OP_COUNT];
 
 	float outs_[OP_COUNT];
