@@ -11,9 +11,17 @@ static inline float clamp01f(float v) { return (v<0?0:(v>1.f?1.0f:v)); }
 
 Algorithm defaultAlgorithm { 
 		.operatorCount = 4, 
-		.mods  = { 0b00000001,  0b00000010,  0b00001000, 0b00000000 },
-		.outs  = { 1,  0,  1,  0 },
+		.mods  = { 0b000010,  0b000010,  0b001000, 0b000000 },
+		.outs  = 0b000101,
 };
+
+
+Algorithm dx7_1Algo { 
+		.operatorCount = 6,
+		.mods  = { 0b000010, 0b000000, 0b001000, 0b010000, 0b100000, 0b100000 },
+		.outs  = 0b000101,
+};
+
 
 
 Osc::Osc() { }
@@ -126,7 +134,8 @@ float Operator::evaluate(float modulation) const
 
 //
 
-Instrument::Instrument() : algo_(defaultAlgorithm) { }
+Instrument::Instrument()
+: algo_(&defaultAlgorithm) { }
 
 
 Voice::Voice() : algo_(defaultAlgorithm) { }
@@ -166,16 +175,15 @@ float Voice::evaluate()
 			float modulation = 0;
 			uint8_t modFlags = algo_.mods[i];
 			if( modFlags!= 0) {
-				for(int m = 0; m < algo_.operatorCount;++m) {
-					if(modFlags&1) {
-						modulation += outs_[algo_.mods[m]];
+				for(int m = algo_.operatorCount -1; m >= i; --m) {
+					if(modFlags&(1u<<m)) {
+						modulation += outs_[m];
 					}
-					modFlags >>= 1;
 				}
 			}
 			outs_[i] = ops_[i].evaluate(modulation);
 
-			if(algo_.outs[i]) { output += outs_[i]; count++; }
+			if(algo_.outs & (1u<<i)) { output += outs_[i]; count++; }
 		}
 		output = output * 1.f/count;
 	}
@@ -188,7 +196,7 @@ bool Voice::update(float dt)
 
 	if( active_ ) {
 		for(int i = 0; i < algo_.operatorCount; ++i) {
-			playing |= ops_[i].update(dt) && (algo_.outs[i] != 0);
+			playing |= ops_[i].update(dt) && (algo_.outs&(1u<<i));
 		}
 		active_ = playing;
 	}
@@ -246,10 +254,10 @@ void VulkFM::trigger(int8_t note, int8_t channel, int8_t /*velocity*/)
 	if( voice != nullptr) {
 		if( !voice->isActive() ) {
 
-			auto inst = getInstrumentByChannel(channel);
+			Instrument* inst = getInstrumentByChannel(channel);
 			voice->trigger(note, inst);
 
-			auto &voiceNotePair = activeVoices_[activeCount_++];
+			ActiveVoice &voiceNotePair = activeVoices_[activeCount_++];
 			voiceNotePair.note_ = note;
 			voiceNotePair.voice_ = voice;
 		} else {
@@ -289,7 +297,6 @@ float VulkFM::evaluate()
 
 	outBuffer_[outBufferIdx_++] = sample;
 	outBufferIdx_ =  outBufferIdx_ % 1024;
-
 
 	fflush(stdout);
 

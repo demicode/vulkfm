@@ -62,6 +62,46 @@ static void open_window()
 }
 
 
+
+static uint8_t depth[OP_COUNT];
+
+static void prepare_algo_draw_data(const Algorithm* _algo)
+{
+	memset(depth, 0, sizeof(depth));
+
+	int opcnt = _algo->operatorCount;
+	for(int i = 0; i < opcnt;++i) {
+		if(_algo->outs & (1u<<i)) {
+			int mods = _algo->mods[i];
+			for(int o = 0; o < opcnt;++o) {
+				if((mods&(1u<<o)) && depth[i]>=depth[o]) {
+					depth[o] = depth[i]+1;
+				}
+				// mods>>=1;
+			}
+		}
+	}
+}
+
+
+static void draw_algo_rep(const Algorithm* _algo)
+{
+	static const char* numStrings[] = { "0", "1", "2", "3", "4", "5", "6"};
+
+	for(int i = 0; i < _algo->operatorCount;++i) {
+		if(i>0) ImGui::SameLine();
+		ImDrawList* draw_list = ImGui::GetWindowDrawList();
+		ImVec2 p = ImGui::GetCursorScreenPos();
+		ImVec2 b(p.x+16, p.y+16);
+		draw_list->AddRect(p, b, 0xffffffffu);
+		draw_list->AddText(ImVec2(p.x+5, p.y+1), 0xffffffffu, numStrings[depth[i]]);
+
+		// Tell layout how much is occupied by custom shit
+		ImGui::Dummy(ImVec2(20,20));
+	}
+}
+
+ 
 int main(int /*argc*/, char* /*argv*/[])
 {
 	VulkFM vulkSynth;
@@ -130,6 +170,9 @@ int main(int /*argc*/, char* /*argv*/[])
 
 	int octave = 4;
 
+	auto instrument = vulkSynth.getInstrument(0);
+	prepare_algo_draw_data(instrument->algo_);
+
 	while(!quit)
 	{
 		while(SDL_PollEvent(&event))
@@ -142,9 +185,9 @@ int main(int /*argc*/, char* /*argv*/[])
 			case SDL_KEYDOWN:
 				if(event.key.repeat != 0)
 					continue;
-				if(event.key.keysym.sym == SDLK_ESCAPE)
-					quit = true;
-				else {
+				// if(event.key.keysym.sym == SDLK_ESCAPE)
+				// 	quit = true;
+				{
 					auto key = event.key.keysym.scancode;
 					for(size_t i = 0 ; i < sizeof(keymap); ++i)
 					{
@@ -183,7 +226,7 @@ int main(int /*argc*/, char* /*argv*/[])
 		// Render UI / visualization
 
 		{
-			auto instrument = vulkSynth.getInstrument(0);
+			// auto instrument = vulkSynth.getInstrument(0);
 
 			ImGui::Begin("VulkFM");
 
@@ -195,12 +238,46 @@ int main(int /*argc*/, char* /*argv*/[])
 				ImGui::TreePop();
 			}
 
+
+			ImGui::End();
+
+			ImGui::SetNextWindowSize(ImVec2(528,332));
+			ImGui::Begin("Wave");
+			auto samples = vulkSynth.getOutBuffer();
+
+		    ImGui::PlotLines("", samples, 512, 0,  NULL, -1.5f, 1.5f, ImVec2(512,300), sizeof(float));
+
+			ImGui::End();
+
+			// Show algorithm data
+			ImGui::Begin("Instrument");
+
+			const Algorithm * algo = instrument->algo_;
+
+			ImGui::Text("outputs: %u", algo->outs);
+
+			ImGui::Text("modulation: %d %d %d %d %d %d"
+				, algo->mods[0]
+				, algo->mods[1]
+				, algo->mods[2]
+				, algo->mods[3]
+				, algo->mods[4]
+				, algo->mods[5]
+			);
+
+
+			// Testring custom draw 
+
+
+			draw_algo_rep(instrument->algo_);
+
+
 			if(ImGui::TreeNode("Operators"))
 			{
 				// for operator in instrument...
 				std::string name = "Operator x";
 
-				int operatorCount = instrument->algo_.operatorCount;				
+				int operatorCount = instrument->algo_->operatorCount;				
 
 				for( int i = 0; i< operatorCount;++i)
 				{
@@ -228,38 +305,8 @@ int main(int /*argc*/, char* /*argv*/[])
 				}
 
 				ImGui::TreePop();
-
+	
 			}
-			ImGui::End();
-
-			ImGui::SetNextWindowSize(ImVec2(528,332));
-			ImGui::Begin("Wave");
-			auto samples = vulkSynth.getOutBuffer();
-
-		    ImGui::PlotLines("", samples, 512, 0,  NULL, -1.5f, 1.5f, ImVec2(512,300), sizeof(float));
-
-			ImGui::End();
-
-			// Show algorithm data
-			ImGui::Begin("Instrument");
-
-			ImGui::Text("outputs: %d %d %d %d %d %d"
-				, instrument->algo_.outs[0]
-				, instrument->algo_.outs[1]
-				, instrument->algo_.outs[2]
-				, instrument->algo_.outs[3]
-				, instrument->algo_.outs[4]
-				, instrument->algo_.outs[5]
-			);
-
-			ImGui::Text("modulation: %d %d %d %d %d %d"
-				, instrument->algo_.mods[0]
-				, instrument->algo_.mods[1]
-				, instrument->algo_.mods[2]
-				, instrument->algo_.mods[3]
-				, instrument->algo_.mods[4]
-				, instrument->algo_.mods[5]
-			);
 
 			ImGui::End();
 		}

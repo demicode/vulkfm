@@ -40,14 +40,15 @@ struct Algorithm
 {
 	int8_t operatorCount;    //
 	uint8_t mods[OP_COUNT];  // bit flags for what input modules the operator
-	int8_t outs[OP_COUNT];
+	uint8_t outs;			// bit flags for what operators should be mixed to out
 };
 
 
 struct Instrument
 {
 	Instrument();
-	const Algorithm&  algo_;
+	void setAlgorithm(const Algorithm* _algo) { algo_ = _algo; }
+	const Algorithm*  algo_;
 	OperatorConf opConf_[OP_COUNT];
 };
 
