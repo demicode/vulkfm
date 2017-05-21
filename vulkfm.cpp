@@ -135,10 +135,6 @@ float Operator::evaluate(float modulation) const
 
 //
 
-Instrument::Instrument()
-: algo_(&defaultAlgorithm) { }
-
-
 Voice::Voice()
 : inst_(nullptr)
 , opCount_(0)

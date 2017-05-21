@@ -46,7 +46,6 @@ struct Algorithm
 
 struct Instrument
 {
-	Instrument();
 	void setAlgorithm(const Algorithm* _algo) { algo_ = _algo; }
 	const Algorithm*  algo_;
 	OperatorConf opConf_[OP_COUNT];
