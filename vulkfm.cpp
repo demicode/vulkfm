@@ -4,7 +4,16 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 #include <cassert>
+
+#define TIN_FOIL
+
+#define A4 440.f
+#if defined(TIN_FOIL)
+	#undef A4
+	#define A4 432.f
+#endif
 
 #define TAU (float)(2*M_PI)
 
@@ -150,7 +159,7 @@ void Voice::trigger(int _note, const Instrument* _inst)
 	opCount_ = _inst->algo_->operatorCount;
 	int freqDiff = _note-57; // Midi note 57 is A4 (440Hz)
 
-	float baseFreq = 440.f * powf( ACONST, (float)freqDiff);
+	float baseFreq = A4 * powf( ACONST, (float)freqDiff);
 
 	for(int i = 0; i < opCount_; ++i) {
 		ops_[i].trigger(baseFreq, &_inst->opConf_[i]);
