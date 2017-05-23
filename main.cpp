@@ -1,4 +1,8 @@
+#if defined(_WIN32)
+#include "SDL.h"
+#else
 #include <SDL2/sdl.h>
+#endif
 #include <cstdio>
 #include <cstdint>
 #include <cstring>

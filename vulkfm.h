@@ -4,7 +4,7 @@
 #include <cstdint>
 
 #define OP_COUNT 6
-
+#define MAX_EVENTS 16
 #define ACONST 	1.059463094359f
 
 
@@ -33,7 +33,7 @@ struct OperatorConf
 	float oscAmp = 1.0f;
 	float freqScale = 1.0f;
 	EWaveForm oscWaveform = EWaveForm::Sine;
-	int8_t modulators = 0; 		// Bit mask for what operator out to use for modulation of this one.
+	uint8_t modulators = 0; 		// Bit mask for what operator out to use for modulation of this one.
 };
 
 struct Algorithm
@@ -79,7 +79,6 @@ class Osc
 public:
 	Osc();
 	void trigger(float _freq, const OperatorConf *opCont);
-	void retrigger();
 	void update(float time);
 	float evaluate(float fmodulation) const;
 
@@ -135,6 +134,26 @@ protected:
 
 class VulkFM
 {
+protected:
+	struct ActiveVoice {
+		int note_;
+		Voice* voice_;
+	};
+
+	enum EEvent {
+		None,
+		Trigger,
+		Release,
+	};
+
+	struct NoteEvent {
+		int8_t note_ = 0;
+		int8_t ch_ = 0;
+		int8_t vel_ = 0;
+		EEvent event_ = EEvent::None;
+	};
+
+
 public:
 	VulkFM();
 
@@ -156,17 +175,15 @@ protected:
 	Voice* getFromPool();
 	void returnToPool(Voice*);
 
+	void handleEvent(const struct NoteEvent&);
 	Instrument* getInstrumentByChannel(int /*channel*/) { return activeInstrument_; }
 
 protected:
-
 	Instrument* activeInstrument_;
 
-	struct ActiveVoice
-	{
-		int note_;
-		Voice* voice_;
-	};
+	struct NoteEvent eventList_[MAX_EVENTS];
+	uint16_t eventHead_ = 0;
+	uint16_t eventTail_ = 0;
 
 	Voice** voicePool_;
 	int poolCount_;

@@ -6,7 +6,7 @@
 #include <cstdio>
 #include <cassert>
 
-#define TAU (2*M_PI)
+#define TAU (float)(2*M_PI)
 
 static inline float clamp01f(float v) { return (v<0?0:(v>1.f?1.0f:v)); }
 
@@ -154,7 +154,7 @@ void Voice::trigger(int _note, const Instrument* _inst)
 	opCount_ = _inst->algo_->operatorCount;
 	int freqDiff = _note-57; // Midi note 57 is A4 (440Hz)
 
-	float baseFreq = 440.f * powf( ACONST, freqDiff);
+	float baseFreq = 440.f * powf( ACONST, (float)freqDiff);
 
 	for(int i = 0; i < opCount_; ++i) {
 		ops_[i].trigger(baseFreq, &_inst->opConf_[i]);
@@ -247,49 +247,88 @@ VulkFM::~VulkFM()
 }
 
 
-void VulkFM::trigger(int8_t note, int8_t channel, int8_t /*velocity*/)
+void VulkFM::trigger(int8_t note, int8_t channel, int8_t velocity)
 {
-	Voice* voice = nullptr;
-
-	for(int i = 0; i < activeCount_; ++i) {
-		if(activeVoices_[i].note_ == note ) {
-			voice = activeVoices_[i].voice_;
-			break;
-		}
-	}
-
-	if( voice == nullptr ) {
-		voice = getFromPool();
-	}
-
-	if( voice != nullptr) {
-		if( !voice->isActive() ) {
-
-			Instrument* inst = getInstrumentByChannel(channel);
-			voice->trigger(note, inst);
-
-			ActiveVoice *voiceNotePair = &activeVoices_[activeCount_];
-			voiceNotePair->note_ = note;
-			voiceNotePair->voice_ = voice;
-			activeCount_++;
-		} else {
-			voice->retrigger();
-		}
+	int nextHead = (eventHead_ + 1) % MAX_EVENTS;
+	if (nextHead != eventTail_)
+	{
+		int idx = eventHead_;
+		eventList_[idx].ch_ = channel;
+		eventList_[idx].note_ = note;
+		eventList_[idx].vel_ = velocity;
+		eventList_[idx].event_ = EEvent::Trigger;
+		eventHead_ = nextHead;
 	}
 }
 
 void VulkFM::release(int8_t note, int8_t /*channel*/, int8_t /*velocity*/)
 {
-	for(int i = 0; i < activeCount_; ++i) {
-		if(activeVoices_[i].note_ == note ) {
-			activeVoices_[i].voice_->release();
-			break;
+	int nextHead = (eventHead_ + 1) % MAX_EVENTS;
+	if (nextHead != eventTail_)
+	{
+		int idx = eventHead_;
+		eventList_[idx].note_ = note;
+		eventList_[idx].event_ = EEvent::Release;
+		eventHead_ = nextHead;
+	}
+}
+
+
+void VulkFM::handleEvent(const struct VulkFM::NoteEvent& evnt)
+{
+	int8_t note = evnt.note_;
+	if (evnt.event_ == EEvent::Trigger)
+	{
+		Voice* voice = nullptr;
+
+		for (int i = 0; i < activeCount_; ++i) {
+			if (activeVoices_[i].note_ == note) {
+				voice = activeVoices_[i].voice_;
+				break;
+			}
+		}
+
+		if (voice == nullptr) {
+			voice = getFromPool();
+		}
+
+		if (voice != nullptr) {
+			if (!voice->isActive()) {
+
+				Instrument* inst = getInstrumentByChannel(evnt.ch_);
+				voice->trigger(note, inst);
+
+				ActiveVoice *voiceNotePair = &activeVoices_[activeCount_];
+				voiceNotePair->note_ = note;
+				voiceNotePair->voice_ = voice;
+				activeCount_++;
+			}
+			else {
+				voice->retrigger();
+			}
+		}
+	}
+	else if (evnt.event_ == EEvent::Release)
+	{
+		for (int i = 0; i < activeCount_; ++i) {
+			if (activeVoices_[i].note_ == note) {
+				activeVoices_[i].voice_->release();
+				break;
+			}
 		}
 	}
 }
 
+
 void VulkFM::update(float dt)
 {
+	while ((eventHead_ - eventTail_) != 0)
+	{
+		uint16_t idx = eventTail_;
+		handleEvent(eventList_[idx]);
+		eventTail_ = (eventTail_+1)%MAX_EVENTS;
+	}
+
 	for(int i = 0; i < activeCount_; ++i) {
 		bool playing = activeVoices_[i].voice_->update(dt);
 		if(!playing) {
