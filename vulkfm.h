@@ -49,6 +49,7 @@ struct Instrument
 	void setAlgorithm(const Algorithm* _algo) { algo_ = _algo; }
 	const Algorithm*  algo_;
 	OperatorConf opConf_[OP_COUNT];
+	int serialize(uint8_t* buffer, int maxSize) const;
 };
 
 extern Algorithm defaultAlgorithm;

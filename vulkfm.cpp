@@ -143,6 +143,36 @@ float Operator::evaluate(float modulation) const
 }
 
 //
+int Instrument::serialize(uint8_t* buffer, int maxSize) const
+{
+	int bytesWritten = 0;
+	if(maxSize > 100) {
+		// Start with algorithm
+		buffer[bytesWritten++] = 'A';
+		buffer[bytesWritten++] = (uint8_t)algo_->operatorCount;
+		for(int i = 0; i < algo_->operatorCount; ++i) {
+			buffer[bytesWritten++] = (uint8_t)algo_->mods[i];
+		}
+		buffer[bytesWritten++] = algo_->outs;
+
+		for(int i = 0; i < algo_->operatorCount; ++i) {
+			// Write operator config.
+			buffer[bytesWritten++] = 'O';
+			// envelope first... 
+			// TODO: define big or little endian.. just use native for now.
+			memcpy(buffer, &opConf_[i].env, sizeof(EnvConf));
+			bytesWritten += sizeof(EnvConf);
+
+			// 
+
+			printf("opconf size: %ld\n", sizeof(OperatorConf));
+
+		}
+
+	}
+	return bytesWritten;
+}
+
 
 Voice::Voice()
 : inst_(nullptr)
@@ -152,6 +182,7 @@ Voice::Voice()
 	for(int i = 0; i < OP_COUNT; ++i)
 		outs_[i] = 0;
 }
+
 
 void Voice::trigger(int _note, const Instrument* _inst)
 {

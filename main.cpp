@@ -102,6 +102,10 @@ static void draw_algo_rep(const Algorithm* _algo)
 
 		// Tell layout how much is occupied by custom shit
 		ImGui::Dummy(ImVec2(20,20));
+		if(ImGui::IsItemClicked())
+		{
+			// printf("clicked operator %d\n", i);
+		}	
 	}
 }
 
@@ -176,6 +180,15 @@ int main(int /*argc*/, char* /*argv*/[])
 
 	auto instrument = vulkSynth.getInstrument(0);
 	prepare_algo_draw_data(instrument->algo_);
+
+	// Test serialization
+
+	uint8_t buffer[200];
+	int maxSize = 199;
+
+	int written = instrument->serialize(buffer, maxSize);
+	printf("serialize instrument into %d bytes", written);
+
 
 	while(!quit)
 	{
