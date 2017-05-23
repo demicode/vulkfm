@@ -171,6 +171,10 @@ public:
 
 	Instrument* getInstrument(int /*idx*/) { return activeInstrument_; }
 
+
+	int getInstrumentCount();
+	Instrument* getInstrumentList();
+
 protected:
 	Voice* getFromPool();
 	void returnToPool(Voice*);
@@ -184,6 +188,10 @@ protected:
 	struct NoteEvent eventList_[MAX_EVENTS];
 	uint16_t eventHead_ = 0;
 	uint16_t eventTail_ = 0;
+
+	Instrument** instrumentList_;
+	int instrumentCount_;
+	int maxInstrumentCount_;
 
 	Voice** voicePool_;
 	int poolCount_;

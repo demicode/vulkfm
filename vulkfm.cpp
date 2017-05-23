@@ -19,6 +19,15 @@
 
 static inline float clamp01f(float v) { return (v<0?0:(v>1.f?1.0f:v)); }
 
+
+Algorithm debugAlgorithm { 
+		.operatorCount = 4, 
+		.mods  = { 0b000010,  0b000100,  0b001000, 0b001000 },
+		.outs  = 0b000001,
+};
+
+
+
 Algorithm defaultAlgorithm { 
 		4, // opeartor count
 		{ 0b000010,  0b000010,  0b001000, 0b000000 }, // operator modulators
@@ -265,6 +274,12 @@ VulkFM::VulkFM()
 	activeCount_ = 0;
 
 	activeInstrument_ = new Instrument();
+	activeInstrument_->setAlgorithm(&dx7_1Algo);
+
+	// allocate memory for instrument list
+	maxInstrumentCount_ = 32; // arbitrary number, could be anything.
+	instrumentList_ = new Instrument*[maxInstrumentCount_];
+	instrumentCount_ = 0;
 }
 
 VulkFM::~VulkFM()
