@@ -29,11 +29,11 @@ struct EnvConf
 struct OperatorConf
 {
 	EnvConf env;
-	float oscFreq;
+	float oscFreq = 0;
 	float oscAmp = 1.0f;
 	float freqScale = 1.0f;
-	EWaveForm oscWaveform;
-	int8_t modulators; 		// Bit mask for what operator out to use for modulation of this one.
+	EWaveForm oscWaveform = EWaveForm::Sine;
+	int8_t modulators = 0; 		// Bit mask for what operator out to use for modulation of this one.
 };
 
 struct Algorithm

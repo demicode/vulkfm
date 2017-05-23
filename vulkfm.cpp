@@ -1,6 +1,7 @@
 
 #include "vulkfm.h"
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdio>
 #include <cassert>
@@ -10,16 +11,16 @@
 static inline float clamp01f(float v) { return (v<0?0:(v>1.f?1.0f:v)); }
 
 Algorithm defaultAlgorithm { 
-		.operatorCount = 4, 
-		.mods  = { 0b000010,  0b000010,  0b001000, 0b000000 },
-		.outs  = 0b000101,
+		4, // opeartor count
+		{ 0b000010,  0b000010,  0b001000, 0b000000 }, // operator modulators
+		0b000101, // output operators
 };
 
 
 Algorithm dx7_1Algo { 
-		.operatorCount = 6,
-		.mods  = { 0b000010, 0b000000, 0b001000, 0b010000, 0b100000, 0b100000 },
-		.outs  = 0b000101,
+		6, // operator count 
+		{ 0b000010, 0b000000, 0b001000, 0b010000, 0b100000, 0b100000 }, // operator modulators
+		0b000101, // output opeartors
 };
 
 
@@ -138,7 +139,14 @@ Instrument::Instrument()
 : algo_(&defaultAlgorithm) { }
 
 
-Voice::Voice() { }
+Voice::Voice()
+: inst_(nullptr)
+, opCount_(0)
+, active_(false)
+{
+	for(int i = 0; i < OP_COUNT; ++i)
+		outs_[i] = 0;
+}
 
 void Voice::trigger(int _note, const Instrument* _inst)
 {
@@ -260,9 +268,10 @@ void VulkFM::trigger(int8_t note, int8_t channel, int8_t /*velocity*/)
 			Instrument* inst = getInstrumentByChannel(channel);
 			voice->trigger(note, inst);
 
-			ActiveVoice &voiceNotePair = activeVoices_[activeCount_++];
-			voiceNotePair.note_ = note;
-			voiceNotePair.voice_ = voice;
+			ActiveVoice *voiceNotePair = &activeVoices_[activeCount_];
+			voiceNotePair->note_ = note;
+			voiceNotePair->voice_ = voice;
+			activeCount_++;
 		} else {
 			voice->retrigger();
 		}
@@ -300,9 +309,6 @@ float VulkFM::evaluate()
 
 	outBuffer_[outBufferIdx_++] = sample;
 	outBufferIdx_ =  outBufferIdx_ % 1024;
-
-	fflush(stdout);
-
 	return sample*0.3f;
 }
 
