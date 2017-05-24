@@ -58,7 +58,7 @@ float Osc::evaluate(float fmodulation) const
 }
 
 
-Env::Env() : state_(4) { }
+Env::Env() : state_(4), level_(0) { }
 
 void Env::trigger( const EnvConf* _envConf) { envConf_ = _envConf; state_ = 0; }
 void Env::retrigger() { state_ = 0; }
