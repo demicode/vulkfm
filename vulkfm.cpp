@@ -322,7 +322,7 @@ void VulkFM::handleEvent(const struct VulkFM::NoteEvent& evnt)
 
 void VulkFM::update(float dt)
 {
-	while ((eventHead_ - eventTail_) != 0)
+	while (eventHead_ != eventTail_)
 	{
 		uint16_t idx = eventTail_;
 		handleEvent(eventList_[idx]);
