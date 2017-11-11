@@ -15,7 +15,7 @@ OBJS_C:=$(SRC_C:.c=.o)
 CFLAGS=-Wall -Wextra  -m64 -I external/imgui/examples/sdl_opengl_example \
 		-I external/imgui/examples/libs/gl3w
 
-CXXFLAGS=-Wall -Wextra -std=c++14 -m64 $(shell sdl2-config --cflags) -O0 -g -I external/imgui \
+CXXFLAGS=-Wall -Wextra -std=c++14 -m64 $(shell sdl2-config --cflags) -O3 -I external/imgui \
 								-I external/imgui/examples/sdl_opengl3_example \
 								-I external/imgui/examples/libs/gl3w
 LDFLAGS=$(shell sdl2-config --libs)

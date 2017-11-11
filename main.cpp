@@ -1,7 +1,7 @@
 #if defined(_WIN32)
 #include "SDL.h"
 #else
-#include <SDL2/sdl.h>
+#include <SDL2/SDL.h>
 #endif
 #include <cstdio>
 #include <cstdint>
@@ -9,11 +9,17 @@
 #include <cmath>
 #include <cassert>
 #include <string>
+#include <chrono>
 #include "imgui.h"
 #include "imgui_internal.h"
 #include "imgui_impl_sdl_gl3.h"
 #include <GL/gl3w.h>
 #include "vulkfm.h"
+
+
+static long timesamples[10];
+static int time_sample_idx = 0;
+static int time_sample_count = 10;
 
 static float sampTime;
 
@@ -24,16 +30,25 @@ static void audio_fill_buffer_s16(void* userdata, Uint8* stream, int len)
 
 	VulkFM* synth = (VulkFM*)userdata;
 
+	auto start_time = std::chrono::high_resolution_clock::now();
 
 	for(int i = 0; i < samples;++i)
 	{
 		float sample = synth->evaluate();
 		synth->update(sampTime);
 		// Clip instead of overflow
-		sample = sample<-1.f?-1.f:(sample>1.f?1.f:sample);
+		//sample = sample<-1.f?-1.f:(sample>1.f?1.f:sample);
 		*buff++ = (int16_t)(sample*(32768>>1));
 	}
+
+	auto interval = std::chrono::high_resolution_clock::now() - start_time;
+	auto ns = std::chrono::nanoseconds(interval);
+
+	timesamples[time_sample_idx++] = (ns/len).count();
+	time_sample_idx %= time_sample_count;
+//	ns.
 }
+
 
 static SDL_Window* window = nullptr;
 
@@ -123,7 +138,7 @@ int main(int /*argc*/, char* /*argv*/[])
 
 	memset(&want,0,sizeof(want));
 
-	want.freq = 48000;
+	want.freq = 44100;
 	want.format = AUDIO_S16SYS;
 	// want.format = AUDIO_F32SYS;
 	want.channels = 1;
@@ -139,7 +154,12 @@ int main(int /*argc*/, char* /*argv*/[])
 	}
 
 
-	printf("Got an audio device %d with %d channels, %d frequency and %d samples in %d format.\n", audio_device, got.channels, got.freq, got.samples, got.format);
+	printf("Got an audio device %d with %d channels, %d frequency and %d samples in %d format.\n",
+	 		audio_device,
+	 		got.channels, 
+	 		got.freq, 
+	 		got.samples, 
+	 		got.format);
 
 
 	int keymap[] {
@@ -252,6 +272,12 @@ int main(int /*argc*/, char* /*argv*/[])
 				ImGui::Text("Playback frequency is %dHz", got.freq);
 				ImGui::Text("There are %d active voices", vulkSynth.activeVoices());
 				ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+				long long ns = 0;
+				for( int i = 0; i < time_sample_count;++i)
+					ns += timesamples[i];
+				ns /= time_sample_count;
+
+				ImGui::Text("Sound generation time %lldns per sample", ns );
 				ImGui::TreePop();
 			}
 
